@@ -1,0 +1,4 @@
+node_modules/
+.diagrun/
+rapport*.html
+.DS_Store

@@ -1,0 +1,18 @@
+{
+  "name": "diagrun",
+  "version": "0.1.0",
+  "description": "Où partent tes tokens Claude Code ? Un diagnostic en une commande, 100 % local.",
+  "license": "MIT",
+  "author": "François Nollet",
+  "homepage": "https://github.com/Francoisnollet/diagrun#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Francoisnollet/diagrun.git"
+  },
+  "bugs": { "url": "https://github.com/Francoisnollet/diagrun/issues" },
+  "bin": { "diagrun": "cli.js" },
+  "scripts": { "start": "node cli.js" },
+  "engines": { "node": ">=18" },
+  "files": ["cli.js"],
+  "keywords": ["claude-code", "tokens", "usage", "diagnostic", "cost"]
+}
