@@ -32,15 +32,35 @@ node --version
 - Si un numéro s'affiche (par exemple `v22.1.0`) et qu'il commence par 18 ou plus : tu es prêt.
 - Si tu obtiens une erreur du type « commande introuvable » : installe Node depuis [nodejs.org](https://nodejs.org) (choisis la version « LTS »), puis rouvre ton terminal et refais le test.
 
-Sous Windows, le terminal est PowerShell (cherche « PowerShell » dans le menu Démarrer).
-
 ## Lancer diag run
 
-Une seule commande :
+### Méthode 1 : depuis Claude Code (la plus simple)
+
+Dans une session Claude Code, tape à l'invite, **avec le point d'exclamation devant** :
+
+```
+! npx diagrun@latest
+```
+
+Le `!` dit à Claude Code d'exécuter la commande directement, sans passer par Claude. Ton navigateur s'ouvre sur le rapport.
+
+Le `!` ne fonctionne **que dans Claude Code**. Dans un terminal classique (PowerShell, Terminal), ne le tape pas : utilise la méthode 2.
+
+### Méthode 2 : depuis un terminal
+
+Ouvre un terminal :
+- **Windows** : touche Windows, tape `powershell`, Entrée.
+- **Mac** : Cmd + Espace, tape `terminal`, Entrée.
+
+Puis tape la commande, **sans point d'exclamation** :
 
 ```bash
 npx diagrun@latest
 ```
+
+Évite de la lancer depuis un dossier nommé `diagrun`, npx s'y perdrait.
+
+### Ce qui se passe ensuite
 
 La première fois, npx te demande de confirmer l'installation temporaire : réponds `y`. Ensuite, ton navigateur s'ouvre sur le rapport. Il est aussi enregistré dans `~/.diagrun/rapport.html` (sous Windows : `C:\Users\<toi>\.diagrun\rapport.html`).
 
@@ -77,7 +97,7 @@ La variable `DIAGRUN_HOME` change le dossier où le rapport est enregistré.
 
 diag run **ne se connecte jamais à internet**, donc il ne vérifie pas tout seul s'il existe une nouvelle version. Deux choses à faire :
 
-1. **Relance toujours avec `npx diagrun@latest`** : tu as alors la dernière version à chaque fois, sans rien installer.
+1. **Relance toujours avec `npx diagrun@latest`** (précédé de `! ` dans Claude Code) : tu as alors la dernière version à chaque fois, sans rien installer.
 2. **Surveille le dépôt pour être prévenu** : en haut de cette page GitHub, clique sur **Watch**, puis **Custom**, coche **Releases** et valide. GitHub t'enverra un message à chaque nouvelle version, sans te spammer.
 
 Pour savoir quelle version tu utilises, regarde le bas du rapport (« diag run v… ») ou tape `npx diagrun@latest --version`.
