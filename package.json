@@ -1,6 +1,6 @@
 {
   "name": "diagrun",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Où partent tes tokens Claude Code ? Un diagnostic en une commande, 100 % local.",
   "license": "MIT",
   "author": "François Nollet",

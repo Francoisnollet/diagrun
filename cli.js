@@ -11,10 +11,12 @@ const CTX_WARN = 100000, CTX_HIGH = 150000, BIG = 20000;
 const EDIT = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 const READ = new Set(["Read", "Grep", "Glob", "LS", "WebFetch", "WebSearch"]);
 const COMPLEX = /architect|refactor|redesign|migrat|investigat|root cause|pourquoi|concoi|conçoi|stratég|sécurit|security|performance|debug|race condition|from scratch/i;
+const WRITE = /r[ée]dige|[ée]cris|draft|write|prospect|e-?mail|mail\b|brouillon|traduis|translate|r[ée]sume|summari[sz]e/i;
+const CTX_SIMPLE = 40000; // au-delà, une réponse sans outil dépend sans doute de ce qui a été dit avant
 const GIT = /\b(commit|push|pull request|pr|git (status|log|diff))\b/i;
 const LABEL = { "question courte": "questions courtes", exploration: "recherches dans le code",
-  "git/commande": "commandes git", "petite correction": "petites corrections", moyenne: "tâches moyennes", complexe: "tâches complexes" };
-const TARGET = { "question courte": "haiku", exploration: "haiku", "git/commande": "haiku", "petite correction": "haiku", moyenne: "sonnet", complexe: null };
+  "git/commande": "commandes git", "petite correction": "petites corrections", moyenne: "tâches moyennes", complexe: "tâches complexes", "suite de conversation": "suites de conversation" };
+const TARGET = { "question courte": "haiku", exploration: "haiku", "git/commande": "haiku", "petite correction": "haiku", moyenne: "sonnet", complexe: null, "suite de conversation": null };
 const RANK = { haiku: 0, sonnet: 1, opus: 2 };
 
 const VERSION = (() => { try { return require("./package.json").version; } catch { return "dev"; } })();
@@ -36,13 +38,22 @@ function walk(dir, out = []) {
   return out;
 }
 
+// Retire les balises ajoutées par l'éditeur (fichier ouvert, sélection, contenu collé) pour ne garder que le message écrit.
+function cleanPrompt(t) {
+  const x = t
+    .replace(/<(ide_[a-z_]+|system-reminder)>[\s\S]*?<\/\1>/g, " ")
+    .replace(/<pasted_content[^>]*>[\s\S]*?<\/pasted_content>|<pasted_content[^>]*>[\s\S]*$/g, " [contenu collé] ")
+    .replace(/\s+/g, " ").trim();
+  return x || "(message sans texte)";
+}
+
 function realPrompt(e) {
   if (e.type !== "user" || e.isSidechain || e.isMeta) return null;
   const c = e.message && e.message.content;
   if (Array.isArray(c) && c.some((b) => b && b.type === "tool_result")) return null;
-  const t = textOf(c).trim();
-  if (!t || /^(<local-command|Caveat:|<system-reminder)/.test(t)) return null;
-  return t;
+  const raw = textOf(c).trim();
+  if (!raw || /^(<local-command|Caveat:|<system-reminder)/.test(raw)) return null;
+  return cleanPrompt(raw);
 }
 const resultSize = (b) => typeof b.content === "string" ? b.content.length
   : Array.isArray(b.content) ? b.content.reduce((n, x) => n + ((x && x.text) || "").length, 0) : 0;
@@ -126,6 +137,8 @@ function buildTurns(sessions) {
 function classify(t) {
   const nt = t.tools.length, ed = t.edited.size, o = t.usage.out, tools = new Set(t.tools);
   if (COMPLEX.test(t.prompt) || ed >= 5 || tools.has("Task") || o > 8000) return "complexe";
+  if (nt === 0 && t.peak >= CTX_SIMPLE) return "suite de conversation";
+  if (nt === 0 && WRITE.test(t.prompt)) return "moyenne";
   if (nt === 0 && o < 1500) return "question courte";
   if (ed === 0 && [...tools].every((x) => READ.has(x)) && nt <= 10) return "exploration";
   if (GIT.test(t.prompt) && ed === 0) return "git/commande";
@@ -142,7 +155,7 @@ function analyse(turns, clears) {
     if (tgt && RANK[t.main] > RANK[tgt]) {
       const s = t.cost - cost(t.main, t.usage, tgt); save += s;
       const k = `${t.kind}|${t.main}|${tgt}`; fit[k] = fit[k] || { n: 0, save: 0, kind: t.kind, from: t.main, to: tgt };
-      fit[k].n++; fit[k].save += s; examples.push({ s, t });
+      fit[k].n++; fit[k].save += s; if (t.prompt.replace(/\[contenu collé\]|\(message sans texte\)/g, "").trim().length > 3) examples.push({ s, t });
     }
   }
   let afterLo = 0, afterHi = 0, exSum = 0;
@@ -198,7 +211,7 @@ function view(a, n, days) {
     ? card("Si tu avais suivi ces conseils", (pct(a.proj.lo) === pct(a.proj.hi) ? `−${pct(a.proj.lo)} %` : `−${pct(a.proj.lo)} à −${pct(a.proj.hi)} %`), "de consommation",
         `<p>Soit environ <b>×${rng(a.proj.lo, a.proj.hi, mult)}</b> de travail avant d'atteindre ta limite.</p>
 <details><summary>Comment on l'estime</summary><ul><li>Le bon modèle pour les tâches simples : environ <b>−${pct(a.save / a.total)} %</b></li>
-<li>Repartir de zéro avant que la conversation gonfle : environ <b>−${pct(a.proj.ctx)} %</b></li></ul>
+${pct(a.proj.ctx) > 0 ? `<li>Repartir de zéro avant que la conversation gonfle : environ <b>−${pct(a.proj.ctx)} %</b></li>` : `<li>Repartir de zéro : rien à gagner, tes conversations restent courtes</li>`}</ul>
 <p><em>Les deux effets se recoupent, ils ne s'additionnent pas. C'est une estimation : Haiku peut faire un peu moins bien qu'Opus, repartir de zéro oblige à réexpliquer, et le lien avec ta limite d'abonnement reste approximatif.</em></p></details>`, "")
     : card("Si tu avais suivi ces conseils", "≈ 0 %", "d'écart", "<p class='ok'>Tu utilises déjà bien ton forfait : il n'y a presque rien à gagner.</p>", "");
   return `<div class="view" data-days="${days}"><p class="sub">${n} demandes analysées sur ${days > 1 ? `les ${days} derniers jours` : "le dernier jour"}. Tout est resté sur ton ordinateur.</p>
@@ -206,7 +219,7 @@ function view(a, n, days) {
 ${card("Le bon modèle pour la bonne tâche", a.fit.length ? `${savePct} %` : "✓", a.fit.length ? "de ta consommation aurait pu être évitée" : "rien à signaler",
   a.fit.length ? det("Voir le détail", `<ul>${fitRows}</ul><p><em>Exemples :</em></p><ul>${ex}</ul>`) : "<p class='ok'>Tes tâches simples ne tournent pas sur un modèle trop gros.</p>",
   a.fit.length ? "Un gros modèle pour une petite tâche, c'est un camion pour livrer une lettre. Choisis le modèle au début d'une session, ou juste après <code>/clear</code> (commande <code>/model</code>). Changer en pleine conversation oblige Claude à tout relire sans économie : un message cher, qui ne se rentabilise que si la conversation continue longtemps." : "")}
-${card("Conversation trop longue", `${pct(a.crShare)} %`, "de la consommation vient de la relecture de l'historique", det("Voir le détail", `<ul>${ctxItems.join("")}</ul><p><b>Ce qui dure</b> (comment lancer le projet, les conventions, ce qu'il ne faut pas toucher) va dans <code>CLAUDE.md</code>. <b>L'état d'une tâche en cours</b> se range plutôt dans un petit fichier de notes à part : <code>CLAUDE.md</code> est relu à chaque message, donc chaque ligne qu'on y met coûte à chaque fois.</p>`),
+${card("Conversation trop longue", `${pct(a.crShare)} %`, "de la consommation sert à relire l'historique (normal)", (a.proj.ctx >= 0.005 ? `<p>Ce qui se gaspille, c'est la relecture au-delà de 100 000 tokens de contexte : environ <b>${pct(a.proj.ctx)} %</b> de ta consommation.</p>` : `<p class='ok'>Aucune conversation n'a dépassé 100 000 tokens : rien à corriger de ce côté.</p>`) + det("Voir le détail", `<ul>${ctxItems.join("")}</ul><p><b>Ce qui dure</b> (comment lancer le projet, les conventions, ce qu'il ne faut pas toucher) va dans <code>CLAUDE.md</code>. <b>L'état d'une tâche en cours</b> se range plutôt dans un petit fichier de notes à part : <code>CLAUDE.md</code> est relu à chaque message, donc chaque ligne qu'on y met coûte à chaque fois.</p>`),
   "Quand tu changes de sujet, tape <code>/clear</code> : Claude oublie la conversation (il faudra tout réexpliquer) mais ne la relit plus à chaque message. Pour continuer la même tâche, <code>/compact</code> la résume : on perd du détail, alors fais-le entre deux étapes plutôt qu'en plein milieu. Avant de nettoyer, demande à Claude : « note en dix lignes maximum ce qu'il faut retenir de ce projet dans CLAUDE.md ».")}
 ${card("Actions inutiles", String(waste.length || "0"), "signaux repérés", waste.length ? det("Voir le détail", `<ul>${waste.join("")}</ul>`) : "<p class='ok'>Rien de flagrant.</p>",
   waste.length ? "Demande à Claude de chercher dans un fichier précis plutôt que de tout relire." : "")}
@@ -246,7 +259,7 @@ function page(views) {
 <title>diag run</title><style>${CSS}</style>
 <main><h1 class="logo">diag<span class="pill">run</span></h1>${tabs}
 ${body}
-<footer>diag run v${VERSION} · Les montants sont des estimations basées sur les tarifs publics (modifiables dans cli.js). L'analyse de la tâche est approximative : c'est une indication, pas un verdict.</footer></main>${views.length > 1 ? `<script>${TABS_JS}</script>` : ""}</html>`;
+<footer>diag run v${VERSION} · Les montants sont des estimations basées sur les tarifs publics (modifiables dans cli.js). L'analyse de la tâche est approximative : c'est une indication, pas un verdict. Ce rapport peut montrer le début de tes demandes et des chemins de fichiers : relis-le avant d'en partager une capture.</footer></main>${views.length > 1 ? `<script>${TABS_JS}</script>` : ""}</html>`;
 }
 
 function openBrowser(file) {
