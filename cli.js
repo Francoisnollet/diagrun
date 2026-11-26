@@ -55,25 +55,63 @@ function realPrompt(e) {
   if (!raw || /^(<local-command|Caveat:|<system-reminder)/.test(raw)) return null;
   return cleanPrompt(raw);
 }
-const resultSize = (b) => typeof b.content === "string" ? b.content.length
+const resultSize = (b) => typeof b.size === "number" ? b.size : typeof b.content === "string" ? b.content.length
   : Array.isArray(b.content) ? b.content.reduce((n, x) => n + ((x && x.text) || "").length, 0) : 0;
+
+// Lit un fichier ligne par ligne, par morceaux : on ne charge jamais le fichier entier en mémoire.
+function eachLine(file, fn) {
+  const { StringDecoder } = require("string_decoder");
+  let fd; try { fd = fs.openSync(file, "r"); } catch { return; }
+  const buf = Buffer.allocUnsafe(1 << 20), dec = new StringDecoder("utf8"); let rest = "";
+  try {
+    for (;;) {
+      const n = fs.readSync(fd, buf, 0, buf.length, null); if (n <= 0) break;
+      const parts = (rest + dec.write(buf.subarray(0, n))).split("\n"); rest = parts.pop();
+      for (const l of parts) if (l) fn(l);
+    }
+    rest += dec.end(); if (rest) fn(rest);
+  } catch {} finally { try { fs.closeSync(fd); } catch {} }
+}
+
+// Ne garde de chaque entrée que ce dont l'analyse a besoin (jamais le contenu des résultats d'outils).
+function slim(e, t) {
+  const out = { type: e.type, uuid: e.uuid, sessionId: e.sessionId, isSidechain: e.isSidechain, isMeta: e.isMeta, _t: t };
+  const m = e.message; if (!m) return out;
+  const msg = out.message = { id: m.id, model: m.model, usage: m.usage };
+  if (typeof m.content === "string") { msg.content = m.content.slice(0, 20000); return out; }
+  if (!Array.isArray(m.content)) return out;
+  msg.content = [];
+  for (const b of m.content) {
+    if (!b) continue;
+    if (b.type === "tool_use") {
+      const i = b.input || {};
+      msg.content.push({ type: "tool_use", id: b.id, name: b.name,
+        input: { file_path: i.file_path, notebook_path: i.notebook_path, command: typeof i.command === "string" ? i.command.slice(0, 1000) : undefined } });
+    } else if (b.type === "tool_result") {
+      msg.content.push({ type: "tool_result", tool_use_id: b.tool_use_id, size: resultSize(b) });
+    } else if (b.type === "text" && e.type === "user") {
+      msg.content.push({ type: "text", text: String(b.text || "").slice(0, 20000) });
+    }
+  }
+  return out;
+}
 
 function load() {
   const root = path.join(os.homedir(), ".claude", "projects");
   const cutoff = Date.now() - MAX_DAYS * 864e5;
   const sessions = new Map();
   for (const file of walk(root)) {
-    let raw; try { raw = fs.readFileSync(file, "utf8"); } catch { continue; }
-    for (const line of raw.split("\n")) {
-      if (!line) continue;
-      let e; try { e = JSON.parse(line); } catch { continue; }
-      if (!e.timestamp) continue;
-      e._t = Date.parse(e.timestamp);
-      if (!(e._t >= cutoff)) continue;
+    // Un fichier pas modifié depuis la date de coupure ne peut contenir aucune entrée plus récente.
+    try { if (fs.statSync(file).mtimeMs < cutoff) continue; } catch { continue; }
+    eachLine(file, (line) => {
+      let e; try { e = JSON.parse(line); } catch { return; }
+      if (!e.timestamp) return;
+      const t = Date.parse(e.timestamp);
+      if (!(t >= cutoff)) return;
       const sid = e.sessionId || file;
       if (!sessions.has(sid)) sessions.set(sid, []);
-      sessions.get(sid).push(e);
-    }
+      sessions.get(sid).push(slim(e, t));
+    });
   }
   return sessions;
 }
