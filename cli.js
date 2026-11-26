@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// diag run : une commande : lit tes sessions Claude Code, ouvre un diagnostic dans le navigateur.
+// diagrun : une commande : lit tes sessions Claude Code, ouvre un diagnostic dans le navigateur.
 // Tout reste en local : rien n'est envoyé nulle part. Aucune dépendance (Node 18+).
 const fs = require("fs"), path = require("path"), os = require("os");
 const { spawn } = require("child_process");
@@ -218,7 +218,7 @@ ${pct(a.proj.ctx) > 0 ? `<li>Repartir de zéro avant que la conversation gonfle 
 <section><h2>Où part ta consommation</h2>${models}<details><summary>Vérifier ces chiffres dans Claude Code</summary><p>Tape <code>/usage</code> (tokens par modèle) et <code>/context</code> (ce qui remplit ta conversation).</p></details></section>
 ${card("Le bon modèle pour la bonne tâche", a.fit.length ? `${savePct} %` : "✓", a.fit.length ? "de ta consommation aurait pu être évitée" : "rien à signaler",
   a.fit.length ? det("Voir le détail", `<ul>${fitRows}</ul><p><em>Exemples :</em></p><ul>${ex}</ul>`) : "<p class='ok'>Tes tâches simples ne tournent pas sur un modèle trop gros.</p>",
-  a.fit.length ? "Un gros modèle pour une petite tâche, c'est un camion pour livrer une lettre. Choisis le modèle au début d'une session, ou juste après <code>/clear</code> (commande <code>/model</code>). Changer en pleine conversation oblige Claude à tout relire sans économie : un message cher, qui ne se rentabilise que si la conversation continue longtemps." : "")}
+  a.fit.length ? "Un gros modèle pour une petite tâche, c'est un camion pour livrer une lettre. Choisis le modèle au début d'une session, ou juste après <code>/clear</code> (commande <code>/model</code>). Changer en pleine conversation oblige Claude à tout relire sans économie : un message cher, qui ne se rentabilise que si la conversation continue longtemps. Autre réglage utile : l'effort (tape <code>/effort</code>). Plus il est bas, moins Claude réfléchit et vérifie, donc moins il consomme : pour les petites tâches, un effort faible suffit souvent. Garde l'effort élevé pour les tâches difficiles." : "")}
 ${card("Conversation trop longue", `${pct(a.crShare)} %`, "de la consommation sert à relire l'historique (normal)", (a.proj.ctx >= 0.005 ? `<p>Ce qui se gaspille, c'est la relecture au-delà de 100 000 tokens de contexte : environ <b>${pct(a.proj.ctx)} %</b> de ta consommation.</p>` : `<p class='ok'>Aucune conversation n'a dépassé 100 000 tokens : rien à corriger de ce côté.</p>`) + det("Voir le détail", `<ul>${ctxItems.join("")}</ul><p><b>Ce qui dure</b> (comment lancer le projet, les conventions, ce qu'il ne faut pas toucher) va dans <code>CLAUDE.md</code>. <b>L'état d'une tâche en cours</b> se range plutôt dans un petit fichier de notes à part : <code>CLAUDE.md</code> est relu à chaque message, donc chaque ligne qu'on y met coûte à chaque fois.</p>`),
   "Quand tu changes de sujet, tape <code>/clear</code> : Claude oublie la conversation (il faudra tout réexpliquer) mais ne la relit plus à chaque message. Pour continuer la même tâche, <code>/compact</code> la résume : on perd du détail, alors fais-le entre deux étapes plutôt qu'en plein milieu. Avant de nettoyer, demande à Claude : « note en dix lignes maximum ce qu'il faut retenir de ce projet dans CLAUDE.md ».")}
 ${card("Actions inutiles", String(waste.length || "0"), "signaux repérés", waste.length ? det("Voir le détail", `<ul>${waste.join("")}</ul>`) : "<p class='ok'>Rien de flagrant.</p>",
@@ -232,7 +232,7 @@ const CSS = `
 --sans:"Space Grotesk",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--mono:"Space Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace}
 body{margin:0;background:var(--marine);color:#fff;font:16px/1.55 var(--sans)}
 main{max-width:760px;margin:0 auto;padding:36px 20px 72px}
-.logo{font:700 30px var(--sans);letter-spacing:-.5px;margin:0 0 6px}.pill{display:inline-block;margin-left:4px;padding:0 12px;background:var(--rouge);border-radius:999px}
+.logo{font:700 30px var(--sans);letter-spacing:-.5px;margin:0 0 6px}.pill{display:inline-block;margin-left:2px;padding:0 12px;background:var(--rouge);border-radius:999px}
 .sub{color:var(--muted);margin:0 0 28px}
 section{background:var(--deep);border:2px solid var(--deep);border-radius:12px;padding:22px 24px;margin:22px 0;box-shadow:8px 8px 0 var(--ciel)}
 h2{margin:0 0 10px;font:700 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--sable)}
@@ -243,7 +243,7 @@ code{font-family:var(--mono);font-size:.9em;background:var(--marine);padding:1px
 .bar{display:flex;align-items:center;gap:10px;margin:8px 0}.bar span{width:70px;font-family:var(--mono);font-size:14px}
 .bar i{display:block;height:12px;background:var(--sable);border-radius:6px}.bar b{font-weight:700;white-space:nowrap;min-width:52px;text-align:right}
 .ok{color:var(--sable)}
-details{margin:14px 0 0}summary{cursor:pointer;color:var(--ciel);font:700 13px var(--mono);letter-spacing:.04em}summary::marker{color:var(--ciel)}details[open] summary{margin-bottom:6px}footer{color:var(--muted);font-size:13px;margin-top:34px}
+details{margin:14px 0 0}summary{cursor:pointer;color:var(--ciel);font:700 13px var(--mono);letter-spacing:.04em}summary::marker{color:var(--ciel)}details[open] summary{margin-bottom:6px}footer{color:var(--muted);font-size:13px;margin-top:34px;line-height:1.6}footer a{color:var(--sable)}
 [hidden]{display:none!important}
 .tabs{display:flex;gap:8px;margin:14px 0 6px}
 .tabs button{font:700 13px var(--mono);letter-spacing:.04em;background:var(--deep);color:var(--muted);border:2px solid var(--ciel);border-radius:999px;padding:6px 16px;cursor:pointer}
@@ -256,10 +256,10 @@ function page(views) {
     ? `<div class="tabs">${views.map((v, i) => `<button type="button" data-d="${v.days}"${i === 0 ? ' class="on"' : ""}>${v.days} jours</button>`).join("")}</div>` : "";
   const body = views.map((v, i) => view(v.a, v.n, v.days).replace('class="view"', i === 0 ? 'class="view"' : 'class="view" hidden')).join("\n");
   return `<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>diag run</title><style>${CSS}</style>
+<title>diagrun</title><style>${CSS}</style>
 <main><h1 class="logo">diag<span class="pill">run</span></h1>${tabs}
 ${body}
-<footer>diag run v${VERSION} · Les montants sont des estimations basées sur les tarifs publics (modifiables dans cli.js). L'analyse de la tâche est approximative : c'est une indication, pas un verdict. Ce rapport peut montrer le début de tes demandes et des chemins de fichiers : relis-le avant d'en partager une capture.</footer></main>${views.length > 1 ? `<script>${TABS_JS}</script>` : ""}</html>`;
+<footer>diagrun v${VERSION} · Les montants sont des estimations basées sur les tarifs publics (modifiables dans cli.js). L'analyse de la tâche est approximative : c'est une indication, pas un verdict. Ce rapport peut montrer le début de tes demandes et des chemins de fichiers : relis-le avant d'en partager une capture.<br>Ça t'a servi ? Une étoile sur GitHub aide à faire connaître diagrun : <a href="https://github.com/Francoisnollet/diagrun" target="_blank" rel="noopener">github.com/Francoisnollet/diagrun</a></footer></main>${views.length > 1 ? `<script>${TABS_JS}</script>` : ""}</html>`;
 }
 
 function openBrowser(file) {
@@ -283,5 +283,5 @@ views = views.filter((v, i) => i === 0 || v.n !== views[i - 1].n);   // pas d'on
 const out = arg("--out", path.join(process.env.DIAGRUN_HOME || path.join(os.homedir(), ".diagrun"), "rapport.html"));
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, page(views));
-console.log(`Diagnostic prêt (diag run v${VERSION}) : ${out}`);
+console.log(`Diagnostic prêt (diagrun v${VERSION}) : ${out}`);
 if (!process.argv.includes("--no-open")) openBrowser(out);
